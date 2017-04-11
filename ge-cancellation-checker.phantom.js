@@ -7,6 +7,9 @@ var fs = require('fs');
 
 var VERBOSE = false;
 var loadInProgress = false;
+var schedDate;
+var betterDate;
+var full_date;
 
 // Calculate path of this file
 var PWD = '';
@@ -133,13 +136,17 @@ var steps = [
         });
     },
     function() {
-        page.evaluate(function() {
+        schedDate = page.evaluate(function() {
 
             function fireClick(el) {
                 var ev = document.createEvent("MouseEvents");
                 ev.initEvent("click", true, true);
                 el.dispatchEvent(ev);
             }
+
+            var intDate = document.querySelectorAll('.maincontainer p')[3].childNodes[1].textContent;
+
+            console.log('INTERVIEW_DATE:', intDate.toString());
 
             var $rescheduleBtn = document.querySelector('input[name=reschedule]');
 
@@ -149,6 +156,7 @@ var steps = [
 
             fireClick($rescheduleBtn);
             console.log('Entering rescheduling selection page...');
+            return intDate;
         });
     },
     function() {
@@ -170,12 +178,17 @@ var steps = [
 
             fireClick(document.querySelector('input[name=next]'));
 
-            console.log('Choosing Location: ' + location_name);
+            console.log('Choosing Location:', location_name);
         }, settings.enrollment_location_id.toString());
     },
     function() {
+        betterDate = page.evaluate(function(current_date) {
 
-        page.evaluate(function() {
+            function fireClick(el) {
+                var ev = document.createEvent("MouseEvents");
+                ev.initEvent("click", true, true);
+                el.dispatchEvent(ev);
+            }
 
             // If there are no more appointments available at all, there will be a message saying so.
             try {
@@ -189,11 +202,31 @@ var steps = [
             var date = document.querySelector('.date table tr:first-child td:first-child').innerHTML;
             var month_year = document.querySelector('.date table tr:last-child td:last-child div').innerHTML;
 
-            var full_date = month_year.replace(',', ' ' + date + ',');
-            // console.log('');
-            window.callPhantom('report-interview-time', full_date)
-            // console.log('The next available appointment is on ' + full_date + '.');
-        });
+            full_date = month_year.replace(',', ' ' + date + ',');
+
+            var currDate = new Date(current_date);
+            var newDate = new Date(full_date);
+
+            console.log('currDate', currDate.toString());
+            console.log('newDate', newDate.toString());
+
+            var appt = document.querySelector('.entry');
+
+            window.callPhantom('report-interview-time', full_date);
+            console.log('Current scheduled time: ' + current_date);
+
+            var dayNum = newDate.getDay();
+
+            var earlierDate = currDate > newDate;
+
+            console.log("BETTER DATE: " + earlierDate.toString());
+            // and day not on friday, sat, sun
+            // if (earlierDate && dayNum != 0 && dayNum != 6 && dayNum != 5) {
+            if (earlierDate) {
+                fireClick(appt);
+                return earlierDate;
+            }
+        }, schedDate.toString());
     }
 ];
 
